@@ -1,0 +1,5 @@
+{
+  "name": "Sentinel - Auditor de Senha Segura",
+  "description": "Um analisador de força de senha de classe mundial com cálculo de entropia em tempo real e treinamento de segurança via IA usando Gemini.",
+  "requestFramePermissions": []
+}
