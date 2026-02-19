@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Password Shield | by Consciência Segura</title>
+
+<!-- Utilizando CDN para garantir que o zxcvbn carregue corretamente -->
+<script src="https://cdn.jsdelivr.net/npm/zxcvbn@4.4.2/dist/zxcvbn.js"></script>
+<!-- Adicionando biblioteca jsPDF para exportação de relatórios -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family: Arial, sans-serif;
+  background:#0f172a;
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+
+.card{
+  background:#1e293b;
+  padding:30px;
+  border-radius:15px;
+  width:520px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+h2{text-align:center;margin:0;}
+.brand{text-align:center;font-size:12px;opacity:.7;margin-bottom:15px;}
+
+.mode-toggle{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  margin-bottom:15px;
+}
+
+.mode-toggle button{
+  padding:6px 12px;
+  border:1px solid #334155;
+  background: transparent;
+  color: #94a3b8;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:12px;
+  transition: all 0.2s;
+}
+
+.mode-toggle button.active{
+  background:#06b6d4;
+  color:white;
+  border-color: #06b6d4;
+}
+
+.input-wrapper{position:relative;}
+
+input{
+  width:100%;
+  padding:12px;
+  border-radius:6px;
+  border:1px solid #334155;
+  background:#0f172a;
+  color:white;
+  box-sizing: border-box;
+}
+
+input:focus {
+  outline: 2px solid #06b6d4;
+}
+
+.eye{
+  position:absolute;
+  right:12px;
+  top:50%;
+  transform:translateY(-50%);
+  cursor:pointer;
+  user-select: none;
+}
+
+.bar-container {
+  background: #334155;
+  height: 8px;
+  border-radius: 6px;
+  margin-top: 15px;
+  overflow: hidden;
+}
+
+.bar{
+  height:100%;
+  width: 0%;
+  transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.section{
+  margin-top:12px;
+  font-size:13px;
+  line-height:1.5;
+}
+
+.box{
+  margin-top:12px;
+  padding:12px;
+  background:#0f172a;
+  border-left:3px solid #06b6d4;
+  font-size:13px;
+  border-radius: 0 6px 6px 0;
+}
+
+.ai-box {
+  background: rgba(6, 182, 212, 0.05);
+  border-color: #3b82f6;
+}
+
+button.generate{
+  width:100%;
+  padding:10px;
+  margin-top:15px;
+  border-radius:6px;
+  border:none;
+  cursor:pointer;
+  background:#06b6d4;
+  color:white;
+  font-weight:bold;
+  transition: background 0.2s;
+}
+
+button.generate:hover {
+  background: #0891b2;
+}
+
+button.generate.pdf-btn {
+  background: #334155;
+  margin-top: 10px;
+}
+
+button.generate.pdf-btn:hover {
+  background: #475569;
+}
+
+.loading-text {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* Custom scrollbar for the card if it overflows */
+.card::-webkit-scrollbar {
+  width: 6px;
+}
+.card::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react/": "https://esm.sh/react@^19.2.4/"
+  }
+}
+</script>
+\\<link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+
+<div class="card">
+  <h2>🔐 Password Shield</h2>
+  <div class="brand">by Consciência Segura</div>
+
+  <div class="mode-toggle">
+    <button id="eduBtn" class="active" onclick="setMode('educacional')">Modo Educacional</button>
+    <button id="corpBtn" onclick="setMode('corporativo')">Modo Corporativo</button>
+  </div>
+
+  <div class="input-wrapper">
+    <input type="password" id="password" placeholder="Digite sua senha..." oninput="checkPassword()">
+    <span class="eye" onclick="togglePassword()">👁</span>
+  </div>
+
+  <div class="bar-container">
+    <div id="bar" class="bar"></div>
+  </div>
+
+  <div id="threat" class="section"></div>
+  <div id="entropy" class="section"></div>
+
+  <div id="socContainer" style="margin-top:30px; text-align:center;">
+
+    <div style="margin-bottom:10px;">
+      <strong>Painel de Robustez</strong>
+    </div>
+
+    <svg id="socDialSvg" width="260" height="160" viewBox="0 0 260 160">
+
+      <!-- Arcos -->
+      <path d="M20 140 A110 110 0 0 1 70 50"
+            stroke="#dc2626" stroke-width="20" fill="none"/>
+
+      <path d="M70 50 A110 110 0 0 1 130 30"
+            stroke="#f97316" stroke-width="20" fill="none"/>
+
+      <path d="M130 30 A110 110 0 0 1 190 50"
+            stroke="#facc15" stroke-width="20" fill="none"/>
+
+      <path d="M190 50 A110 110 0 0 1 240 140"
+            stroke="#22c55e" stroke-width="20" fill="none"/>
+
+      <!-- Ponteiro -->
+      <line id="socNeedle"
+            x1="130" y1="140"
+            x2="130" y2="60"
+            stroke="white"
+            stroke-width="4"
+            stroke-linecap="round"
+            transform="rotate(-90 130 140)"
+            style="transition: transform 0.6s ease;" />
+
+      <!-- Centro -->
+      <circle cx="130" cy="140" r="6" fill="white"/>
+
+    </svg>
+
+    <div id="socLabel" style="margin-top:10px; font-size:13px;"></div>
+
+  </div>
+
+  <div id="times" class="section"></div>
+
+  <div id="vulnerabilities" class="box"></div>
+  <div id="aiAnalysis" class="box ai-box"></div>
+  <div id="recommendations" class="box"></div>
+  <div id="composition" class="box"></div>
+  <div id="personalData" class="box"></div>
+
+  <button class="generate" onclick="generatePassword()">Gerar senha forte</button>
+  <button class="generate pdf-btn" onclick="generatePDF()">Gerar Relatório Executivo (PDF)</button>
+</div>
+
+<script type="module">
+import { GoogleGenAI } from "@google/genai";
+
+let mode = "educacional";
+let debounceTimer;
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+window.setMode = (selected) => {
+  mode = selected;
+  document.getElementById("eduBtn").classList.remove("active");
+  document.getElementById("corpBtn").classList.remove("active");
+  document.getElementById(selected === "educacional" ? "eduBtn" : "corpBtn").classList.add("active");
+  checkPassword();
+};
+
+window.togglePassword = () => {
+  const input=document.getElementById("password");
+  input.type=input.type==="password"?"text":"password";
+};
+
+function translateTime(text){
+  if(!text) return "";
+  const dict = {
+    "less than a second":"menos de 1 segundo",
+    "seconds":"segundos",
+    "second":"segundo",
+    "minutes":"minutos",
+    "minute":"minuto",
+    "hours":"horas",
+    "hour":"hora",
+    "days":"dias",
+    "day":"dia",
+    "months":"meses",
+    "month":"mês",
+    "years":"anos",
+    "year":"ano",
+    "centuries":"séculos",
+    "century":"século",
+    "millennia":"milênios",
+    "millennium":"milênio"
+  };
+  let result = text;
+  for (const key in dict){
+    result = result.replace(new RegExp(key, 'g'), dict[key]);
+  }
+  return result;
+}
+
+function translateFeedback(text){
+  if(!text) return "";
+
+  const dictionary = {
+    "This is a top-10 common password": "Esta é uma das 10 senhas mais comuns.",
+    "This is a top-100 common password": "Esta é uma das 100 senhas mais comuns.",
+    "This is a very common password": "Esta é uma senha muito comum.",
+    "This is similar to a commonly used password": "Esta senha é semelhante a uma senha comumente utilizada.",
+    "A word by itself is easy to guess": "Uma palavra isolada é fácil de adivinhar.",
+    "Names and surnames by themselves are easy to guess": "Nomes e sobrenomes isolados são fáceis de adihuinar.",
+    "Common names and surnames are easy to guess": "Nomes comuns são fáceis de adivinhar.",
+    "Straight rows of keys are easy to guess": "Sequências de teclado são fáceis de adivinhar.",
+    "Short keyboard patterns are easy to guess": "Padrões curtos de teclado são fáceis de adivinhar.",
+    "Repeated characters are easy to guess": "Caracteres repetidos são fáceis de adivinhar.",
+    "Sequences like abc or 123 are easy to guess": "Sequências como abc ou 123 são fáceis de adivinhar.",
+    "Avoid repeated words and characters": "Evite palavras e caracteres repetidos.",
+    "Avoid sequences": "Evite sequências previsíveis.",
+    "Add another word or two": "Adicione mais uma ou duas palavras.",
+    "Use a few words, avoid common phrases": "Use algumas palavras e evite frases comuns.",
+    "No need for symbols, digits, or uppercase letters": "Não é necessário adicionar símbolos, números ou letras maiúsculas."
+  };
+
+  return dictionary[text] || text;
+}
+
+function calculateEntropy(password){
+  let charset=0;
+  if(/[a-z]/.test(password)) charset+=26;
+  if(/[A-Z]/.test(password)) charset+=26;
+  if(/[0-9]/.test(password)) charset+=10;
+  if(/[^a-zA-Z0-9]/.test(password)) charset+=32;
+  if(charset===0 || password.length === 0) return 0;
+  return (Math.log2(Math.pow(charset,password.length))).toFixed(2);
+}
+
+async function getGeminiAnalysis(password, score, entropy, mode) {
+  if (!password || password.length < 5) return;
+  const aiBox = document.getElementById("aiAnalysis");
+  aiBox.innerHTML = '<strong>Consultoria IA:</strong> <span class="loading-text">Analisando...</span>';
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Analise a segurança da senha: Score ${score}/4, Entropia ${entropy}, Modo ${mode}. (NÃO escreva a senha). Forneça uma dica técnica curta.`,
+      config: {
+        systemInstruction: "Você é um especialista em cibersegurança. Forneça análises concisas e profissionais em Português do Brasil.",
+      }
+    });
+    aiBox.innerHTML = `<strong>Consultoria IA:</strong> ${response.text}`;
+  } catch (e) {
+    aiBox.innerHTML = `<strong>Consultoria IA:</strong> Mantenha sua senha complexa e única.`;
+  }
+}
+
+function analyzeComposition(password){
+
+  const checks = {
+    "Letras minúsculas": /[a-z]/.test(password),
+    "Letras maiúsculas": /[A-Z]/.test(password),
+    "Números": /[0-9]/.test(password),
+    "Símbolos": /[^a-zA-Z0-9]/.test(password),
+    "Tamanho ≥ 12": password.length >= 12
+  };
+
+  let html = "<strong>Composição da Senha:</strong><br>";
+
+  for(const key in checks){
+    html += checks[key]
+      ? "🟢 "+key+"<br>"
+      : "🔴 "+key+"<br>";
+  }
+
+  document.getElementById("composition").innerHTML = html;
+}
+
+function detectPersonalData(password){
+
+  let findings = [];
+
+  if(/19\d{2}|20\d{2}/.test(password)){
+    findings.push("Possível ano detectado (ex: 1994, 2023).");
+  }
+
+  if(/(.)\1{2,}/.test(password)){
+    findings.push("Caracteres repetidos detectados.");
+  }
+
+  if(/1234|abcd|qwerty/i.test(password)){
+    findings.push("Sequência comum detectada.");
+  }
+
+  if(/\d{4,}/.test(password)){
+    findings.push("Sequência numérica longa detectada.");
+  }
+
+  if(/^\w+$/.test(password)){
+    findings.push("Senha composta apenas por caracteres alfanuméricos (sem símbolos).");
+  }
+
+  if(findings.length === 0){
+    document.getElementById("personalData").innerHTML =
+      "<strong>Detector de Dados Pessoais:</strong><br>Nenhum padrão sensível identificado.";
+  } else {
+    document.getElementById("personalData").innerHTML =
+      "<strong>Detector de Dados Pessoais:</strong><br>⚠ "+findings.join("<br>⚠ ");
+  }
+}
+
+function updateSOCIndicator(entropy){
+
+  const needle = document.getElementById("socNeedle");
+  const label = document.getElementById("socLabel");
+
+  const maxEntropy = 120;
+  let normalized = Math.min(entropy / maxEntropy, 1);
+
+  // ângulo entre -90° e +90°
+  let angle = (normalized * 180) - 90;
+
+  needle.setAttribute(
+    "transform",
+    "rotate(" + angle + " 130 140)"
+  );
+
+  let classification;
+  let explanation;
+
+  if(entropy < 40){
+    classification = "Robustez Baixa";
+    explanation = "Senha vulnerável a ataques automatizados.";
+  } 
+  else if(entropy < 60){
+    classification = "Robustez Moderada";
+    explanation = "Pode resistir a ataques online, mas não a ataques offline.";
+  } 
+  else if(entropy < 80){
+    classification = "Boa Robustez";
+    explanation = "Resistência adequada contra ataques comuns.";
+  } 
+  else if(entropy < 100){
+    classification = "Alta Robustez";
+    explanation = "Boa proteção contra hardware moderno.";
+  } 
+  else {
+    classification = "Robustez Elevada";
+    explanation = "Nível recomendado para ambientes corporativos.";
+  }
+
+  if(mode === "educacional"){
+    label.innerText =
+      classification + " — " + explanation + " (" + entropy + " bits)";
+  } else {
+    label.innerText =
+      classification + " | Entropia: " + entropy + " bits";
+  }
+}
+
+window.checkPassword = () => {
+  if(typeof window.zxcvbn !== "function") {
+    document.getElementById("vulnerabilities").innerText = "Carregando motor de análise...";
+    setTimeout(checkPassword, 500);
+    return;
+  }
+
+  const password=document.getElementById("password").value;
+
+  if(password.length===0){
+    document.getElementById("bar").style.width="0%";
+    document.getElementById("threat").innerText="";
+    document.getElementById("entropy").innerText="";
+    document.getElementById("socNeedle").setAttribute("transform", "rotate(-90 130 140)");
+    document.getElementById("socLabel").innerText="";
+    document.getElementById("times").innerText="";
+    document.getElementById("vulnerabilities").innerText="";
+    document.getElementById("recommendations").innerText="";
+    document.getElementById("aiAnalysis").innerText="";
+    document.getElementById("composition").innerText="";
+    document.getElementById("personalData").innerText="";
+    return;
+  }
+
+  const result=window.zxcvbn(password);
+  const entropy=calculateEntropy(password);
+
+  updateSOCIndicator(parseFloat(entropy));
+
+  const levels=[
+    {text:"CRÍTICO",color:"#dc2626"},
+    {text:"ALTO RISCO",color:"#f97316"},
+    {text:"MODERADO",color:"#facc15"},
+    {text:"SEGURO",color:"#22c55e"},
+    {text:"BLINDADO",color:"#16a34a"}
+  ];
+
+  const level=levels[result.score];
+  document.getElementById("bar").style.width=(result.score+1)*20+"%";
+  document.getElementById("bar").style.background=level.color;
+
+  if(mode==="educacional"){
+    document.getElementById("threat").innerHTML=
+      "<strong>Nível de Risco:</strong> <span style='color:"+level.color+"'>"+level.text+"</span>";
+  }else{
+    document.getElementById("threat").innerHTML=
+      "<strong>Score Técnico:</strong> "+result.score+" / 4 | <span style='color:"+level.color+"'>"+level.text+"</span>";
+  }
+
+  document.getElementById("entropy").innerText=
+    "Entropia estimada: "+entropy+" bits";
+
+  document.getElementById("times").innerHTML=
+    "<strong>Simulação de ataque:</strong><br>"+
+    "Online limitado: "+translateTime(result.crack_times_display.online_throttling_100_per_hour)+"<br>"+
+    "Offline (GPU): "+translateTime(result.crack_times_display.offline_fast_hashing_1e10_per_second);
+
+  const warnings = translateFeedback(result.feedback.warning);
+  const suggestions = result.feedback.suggestions.map(s => translateFeedback(s));
+
+  if(warnings || suggestions.length>0){
+    document.getElementById("vulnerabilities").innerHTML=
+      "<strong>Vulnerabilidades Detectadas:</strong><br>"+
+      (warnings ? "• "+warnings+"<br>" : "")+
+      suggestions.map(s=>"• "+s).join("<br>");
+  }else{
+    document.getElementById("vulnerabilities").innerHTML=
+      "<strong>Vulnerabilidades Detectadas:</strong><br>Nenhuma vulnerabilidade significativa identificada.";
+  }
+
+  if(mode==="educacional"){
+    document.getElementById("recommendations").innerHTML=
+      "<strong>Boas Práticas:</strong><br>"+
+      "• Utilize frases longas em vez de palavras simples.<br>"+
+      "• Evite informações pessoais.<br>"+
+      "• Considere recomendações do NIST para senhas modernas.";
+  }else{
+    document.getElementById("recommendations").innerHTML=
+      "<strong>Recomendação Corporativa:</strong><br>"+
+      (result.score>=3
+        ? "Senha compatível com boas práticas modernas."
+        : "Senha não recomendada para ambiente corporativo.");
+  }
+
+  // Gemini Integration
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    getGeminiAnalysis(password, result.score, entropy, mode);
+  }, 1000);
+
+  // Chamar funções de composição e dados pessoais ao final da função
+  analyzeComposition(password);
+  detectPersonalData(password);
+}
+
+window.generatePassword = () => {
+  const chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
+  let p="";
+  for(let i=0;i<16;i++){
+    p+=chars.charAt(Math.floor(Math.random()*chars.length));
+  }
+  document.getElementById("password").value=p;
+  checkPassword();
+}
+
+window.generatePDF = () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  const threat = document.getElementById("threat").innerText;
+  const entropy = document.getElementById("entropy").innerText;
+  const soc = document.getElementById("socLabel").innerText;
+  const vulnerabilities = document.getElementById("vulnerabilities").innerText;
+  const recommendations = document.getElementById("recommendations").innerText;
+
+  const today = new Date().toLocaleDateString("pt-BR");
+
+  // Título
+  doc.setFontSize(18);
+  doc.text("Relatório Executivo de Avaliação de Senha", 20, 20);
+
+  doc.setFontSize(12);
+  doc.text("Password Shield", 20, 30);
+  doc.text("by Consciência Segura", 20, 36);
+
+  doc.text("Data da Análise: " + today, 20, 46);
+
+  doc.line(20, 50, 190, 50);
+
+  let y = 60;
+
+  function addSection(title, content){
+    doc.setFont(undefined, "bold");
+    doc.text(title, 20, y);
+    y += 6;
+
+    doc.setFont(undefined, "normal");
+    const splitText = doc.splitTextToSize(content || "", 170);
+    doc.text(splitText, 20, y);
+    y += (Array.isArray(splitText) ? splitText.length : 1) * 6 + 6;
+  }
+
+  addSection("Classificação Geral:", threat);
+  addSection("Entropia:", entropy);
+  addSection("Painel de Robustez (SOC):", soc);
+  addSection("Vulnerabilidades Detectadas:", vulnerabilities);
+  addSection("Recomendação:", recommendations);
+
+  doc.line(20, y, 190, y);
+  y += 10;
+
+  doc.setFontSize(10);
+  doc.text(
+    "Observação: Este relatório não armazena nem registra a senha analisada.",
+    20,
+    y
+  );
+
+  doc.save("Relatorio_Password_Shield.pdf");
+}
+
+</script>
+
+\\<script type="module" src="/index.tsx"></script>
+</body>
+</html>
